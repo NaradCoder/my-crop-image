@@ -41,7 +41,7 @@
             android:layout_centerVertical="true"
             android:src="@drawable/done_next"
             app:tint="@android:color/white"
-            tools:ignore="contentDescription"/>
+            tools:ignore="contentDescription" />
 
     </RelativeLayout>
 

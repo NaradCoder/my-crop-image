@@ -5,12 +5,18 @@ import android.annotation.SuppressLint;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.Insets;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.WindowInsets;
+import android.view.WindowMetrics;
 import android.widget.ImageView;
 import android.widget.Toast;
 
@@ -23,6 +29,9 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.ArrayList;
 
 public class ImageListActivity extends AppCompatActivity {
@@ -32,72 +41,61 @@ public class ImageListActivity extends AppCompatActivity {
     ImageView showImage, ivDone;
     int clickPosition = -1;
     private Uri mCropImageUri;
+    private Boolean isMultipleImage;
+
+    private int mWidth;
+    private int mHeight;
 
     @SuppressLint("NewApi")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_image_list);
-
+        getScreenWidth();
         rvMedia = findViewById(R.id.rv_media);
         showImage = findViewById(R.id.iv_show_image);
-        adapter = new ImageMediaAdapter(new ArrayList<>(), this, new ImageMediaAdapter.ClickImageListener() {
-            @Override
-            public void onClick(String strUri, int position, String type) {
-                if (type.equalsIgnoreCase("crop")) {
-                    clickPosition = position;
-                    Uri uri = Uri.parse(strUri);
+        adapter = new ImageMediaAdapter(new ArrayList<>(), this, (strUri, position, type) -> {
+            if (type.equalsIgnoreCase("crop")) {
+                clickPosition = position;
+                Uri uri = Uri.parse(strUri);
+                showImage.setImageURI(uri);
+            } else if (type.equalsIgnoreCase("remove")) {
+                adapter.getList().remove(position);
+                adapter.notifyItemRemoved(position);
+                if (adapter.getList().size() > 0) {
+                    clickPosition = 0;
+                    Uri uri = Uri.parse(adapter.getList().get(0));
                     showImage.setImageURI(uri);
-                } else if (type.equalsIgnoreCase("remove")) {
-                    adapter.getList().remove(position);
-                    adapter.notifyItemRemoved(position);
-                    if (adapter.getList().size() > 0) {
-                        clickPosition = 0;
-                        Uri uri = Uri.parse(adapter.getList().get(0));
-                        showImage.setImageURI(uri);
-                    } else {
-                        clickPosition = -1;
-                        showImage.setImageURI(null);
-                        ivDone.setVisibility(View.INVISIBLE);
-                        setResultCancel();
-                    }
+                } else {
+                    clickPosition = -1;
+                    showImage.setImageURI(null);
+                    ivDone.setVisibility(View.INVISIBLE);
+                    setResultCancel();
                 }
             }
         });
 
         rvMedia.setAdapter(adapter);
 
-        showImage.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                cropImage();
-            }
-        });
+        showImage.setOnClickListener(v -> cropImage());
 
         ivDone = findViewById(R.id.iv_add_image);
 
-        ivDone.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent = new Intent();
-                intent.putStringArrayListExtra(CropImage.LIST_IMAGE_EXTRA_RESULT, (ArrayList<String>) adapter.getList());
-                setResult(RESULT_OK, intent);
-                finish();
-            }
-        });
+        ivDone.setOnClickListener(v -> setResultOk());
 
         Bundle bundle = getIntent().getBundleExtra(CropImage.CROP_IMAGE_EXTRA_BUNDLE);
         mCropImageUri = bundle.getParcelable(CropImage.CROP_IMAGE_EXTRA_SOURCE);
+        isMultipleImage = bundle.getBoolean(CropImage.CROP_IMAGE_IS_SINGLE, false);
 
         if (savedInstanceState == null) {
             if (mCropImageUri == null || mCropImageUri.equals(Uri.EMPTY)) {
                 if (CropImage.isExplicitCameraPermissionRequired(this)) {
                     // request permissions and handle the result in onRequestPermissionsResult()
                     requestPermissions(
-                            new String[]{Manifest.permission.CAMERA},
+                            new String[]{Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE},
                             CropImage.CAMERA_CAPTURE_PERMISSIONS_REQUEST_CODE);
                 } else {
-                    CropImage.startPickImageActivity(startActivityForGalleryImageResult, this);
+                    CropImage.startPickImageActivity(startActivityForGalleryImageResult, this, isMultipleImage);
                 }
             } else if (CropImage.isReadExternalStoragePermissionsRequired(this, mCropImageUri)) {
                 // request permissions and handle the result in onRequestPermissionsResult()
@@ -107,7 +105,7 @@ public class ImageListActivity extends AppCompatActivity {
             } else {
                 Intent intent = new Intent();
                 intent.setType("image/*");
-                intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, isMultipleImage);
                 intent.setAction(Intent.ACTION_GET_CONTENT);
                 startActivityForGalleryImageResult.launch(Intent.createChooser(intent, "Select Picture"));
 
@@ -159,37 +157,39 @@ public class ImageListActivity extends AppCompatActivity {
     ActivityResultLauncher<Intent> startActivityForGalleryImageResult = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             new ActivityResultCallback<ActivityResult>() {
-                @SuppressLint("NewApi")
                 @Override
                 public void onActivityResult(ActivityResult result) {
                     if (result.getResultCode() == RESULT_CANCELED) {
                         setResultCancel();
                     } else if (result.getResultCode() == RESULT_OK) {
-                        Intent data = result.getData();
+                        Intent intent = result.getData();
                         try {
-                            if (data == null) {
-                                mCropImageUri = CropImage.getPickImageResultUri(ImageListActivity.this, data);
+                            if (intent == null) {
+                                mCropImageUri = CropImage.getPickImageResultUri(ImageListActivity.this, null);
                                 if (CropImage.isReadExternalStoragePermissionsRequired(ImageListActivity.this, mCropImageUri)) {
                                     // request permissions and handle the result in onRequestPermissionsResult()
-                                    requestPermissions(
-                                            new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
-                                            CropImage.PICK_IMAGE_PERMISSIONS_REQUEST_CODE);
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                        requestPermissions(
+                                                new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
+                                                CropImage.PICK_IMAGE_PERMISSIONS_REQUEST_CODE);
+                                    }
                                 } else {
+                                    resizeImage(mCropImageUri);
                                     adapter.setItem(mCropImageUri.toString());
                                 }
                             } else {
-                                if (data.getData() != null) {
-                                    Uri imageUri = data.getData();
+                                if (intent.getData() != null) {
+                                    Uri imageUri = intent.getData();
+                                    resizeImage(imageUri);
                                     adapter.setItem(imageUri.toString());
-                                    Log.e("ShowCropImage", "registerForActivityResult: " + imageUri);
 
-                                } else if (data.getClipData() != null) {
-                                    ClipData mClipData = data.getClipData();
+                                } else if (intent.getClipData() != null) {
+                                    ClipData mClipData = intent.getClipData();
                                     for (int i = 0; i < mClipData.getItemCount(); i++) {
                                         ClipData.Item item = mClipData.getItemAt(i);
                                         Uri imageUri = item.getUri();
+                                        resizeImage(imageUri);
                                         adapter.setItem(imageUri.toString());
-                                        Log.e("ShowCropImage", "registerForActivityResult_getClipData: " + imageUri);
                                     }
 
                                 }
@@ -201,6 +201,9 @@ public class ImageListActivity extends AppCompatActivity {
                                 showImage.setImageURI(uri);
                                 ivDone.setVisibility(View.VISIBLE);
                             }
+                            if (!isMultipleImage || adapter.getList().size() == 1) {
+                                cropImage();
+                            }
                         } catch (Exception e) {
                             e.printStackTrace();
                             Toast.makeText(ImageListActivity.this, "Something went wrong", Toast.LENGTH_LONG).show();
@@ -209,6 +212,43 @@ public class ImageListActivity extends AppCompatActivity {
                 }
             });
 
+    private void resizeImage(Uri mUri) {
+
+        BitmapUtils.BitmapSampled decodeResult =
+                BitmapUtils.decodeSampledBitmapMin(ImageListActivity.this, mUri, mWidth, mHeight);
+        try {
+            BitmapUtils.writeBitmapToUri(
+                    ImageListActivity.this, decodeResult.bitmap, getOutputUri(), Bitmap.CompressFormat.JPEG, 0);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
+    protected Uri getOutputUri() {
+        Uri outputUri;
+        try {
+            outputUri = Uri.fromFile(File.createTempFile("cropped", ".jpg", getCacheDir()));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to create temp file for output image", e);
+        }
+        return outputUri;
+    }
+
+    public void getScreenWidth() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowMetrics windowMetrics = getWindowManager().getCurrentWindowMetrics();
+            Insets insets = windowMetrics.getWindowInsets()
+                    .getInsetsIgnoringVisibility(WindowInsets.Type.systemBars());
+            mWidth = windowMetrics.getBounds().width() - insets.left - insets.right;
+            mHeight = windowMetrics.getBounds().height() - insets.top - insets.bottom;
+        } else {
+            DisplayMetrics displayMetrics = new DisplayMetrics();
+            getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+            mWidth = displayMetrics.widthPixels;
+            mHeight = displayMetrics.heightPixels;
+        }
+    }
+
     // You can do the assignment inside onAttach or onCreate, i.e, before the activity is displayed
     ActivityResultLauncher<Intent> startActivityForCropResult = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -216,12 +256,19 @@ public class ImageListActivity extends AppCompatActivity {
                 @SuppressLint("NewApi")
                 @Override
                 public void onActivityResult(ActivityResult result) {
-                    if (result.getResultCode() == RESULT_OK) {
+                    if (result.getResultCode() == RESULT_CANCELED) {
+                        setResultCancel();
+                    } else if (result.getResultCode() == RESULT_OK) {
                         Intent data = result.getData();
                         CropImage.ActivityResult result1 = CropImage.getActivityResult(data);
-                        Uri selectedUri = result1.getUri();
-                        adapter.updateItem(selectedUri.toString(), clickPosition);
-                        showImage.setImageURI(selectedUri);
+                        if (result1 != null) {
+                            Uri selectedUri = result1.getUri();
+                            adapter.updateItem(selectedUri.toString(), clickPosition);
+                            showImage.setImageURI(selectedUri);
+                            if (!isMultipleImage || adapter.getList().size() == 1) {
+                                setResultOk();
+                            }
+                        }
                     }
                 }
             });
@@ -229,13 +276,14 @@ public class ImageListActivity extends AppCompatActivity {
 
     @Override
     public void onRequestPermissionsResult(
-            int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
+            int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == CropImage.PICK_IMAGE_PERMISSIONS_REQUEST_CODE) {
             if (mCropImageUri != null
                     && grantResults.length > 0
                     && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 // required permissions granted, start crop image activity
+                Log.e("CropImage", "onRequestPermissionsResult: PERMISSION_GRANTED");
             } else {
                 Toast.makeText(this, R.string.crop_image_activity_no_permissions, Toast.LENGTH_LONG).show();
                 setResultCancel();
@@ -245,7 +293,7 @@ public class ImageListActivity extends AppCompatActivity {
         if (requestCode == CropImage.CAMERA_CAPTURE_PERMISSIONS_REQUEST_CODE) {
             // Irrespective of whether camera permission was given or not, we show the picker
             // The picker will not add the camera intent if permission is not available
-            CropImage.startPickImageActivity(startActivityForGalleryImageResult, this);
+            CropImage.startPickImageActivity(startActivityForGalleryImageResult, this, isMultipleImage);
         }
     }
 
@@ -260,6 +308,16 @@ public class ImageListActivity extends AppCompatActivity {
      */
     protected void setResultCancel() {
         setResult(RESULT_CANCELED);
+        finish();
+    }
+
+    /**
+     * done of select image.
+     */
+    protected void setResultOk() {
+        Intent intent = new Intent();
+        intent.putStringArrayListExtra(CropImage.LIST_IMAGE_EXTRA_RESULT, (ArrayList<String>) adapter.getList());
+        setResult(RESULT_OK, intent);
         finish();
     }
 

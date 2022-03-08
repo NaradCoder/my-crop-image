@@ -39,26 +39,38 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.egl.EGLContext;
 import javax.microedition.khronos.egl.EGLDisplay;
 
-/** Utility class that deals with operations with an ImageView. */
+/**
+ * Utility class that deals with operations with an ImageView.
+ */
 final class BitmapUtils {
 
     static final Rect EMPTY_RECT = new Rect();
 
     static final RectF EMPTY_RECT_F = new RectF();
 
-    /** Reusable rectangle for general internal usage */
+    /**
+     * Reusable rectangle for general internal usage
+     */
     static final RectF RECT = new RectF();
 
-    /** Reusable point for general internal usage */
+    /**
+     * Reusable point for general internal usage
+     */
     static final float[] POINTS = new float[6];
 
-    /** Reusable point for general internal usage */
+    /**
+     * Reusable point for general internal usage
+     */
     static final float[] POINTS2 = new float[6];
 
-    /** Used to know the max texture size allowed to be rendered */
+    /**
+     * Used to know the max texture size allowed to be rendered
+     */
     private static int mMaxTextureSize;
 
-    /** used to save bitmaps during state save and restore so not to reload them. */
+    /**
+     * used to save bitmaps during state save and restore so not to reload them.
+     */
     static Pair<String, WeakReference<Bitmap>> mStateBitmap;
 
     /**
@@ -105,7 +117,9 @@ final class BitmapUtils {
         return new RotateBitmapResult(bitmap, degrees);
     }
 
-    /** Decode bitmap from stream using sampling to get bitmap with the requested limit. */
+    /**
+     * Decode bitmap from stream using sampling to get bitmap with the requested limit.
+     */
     static BitmapSampled decodeSampledBitmap(Context context, Uri uri, int reqWidth, int reqHeight) {
 
         try {
@@ -114,13 +128,42 @@ final class BitmapUtils {
             // First decode with inJustDecodeBounds=true to check dimensions
             BitmapFactory.Options options = decodeImageForOption(resolver, uri);
 
-            if(options.outWidth  == -1 && options.outHeight == -1)
+            if (options.outWidth == -1 && options.outHeight == -1)
                 throw new RuntimeException("File is not a picture");
 
             // Calculate inSampleSize
             options.inSampleSize =
                     Math.max(
-                            calculateInSampleSizeByReqestedSize(
+                            calculateInSampleSizeByRequestedSize(
+                                    options.outWidth, options.outHeight, reqWidth, reqHeight),
+                            calculateInSampleSizeByMaxTextureSize(options.outWidth, options.outHeight));
+
+            // Decode bitmap with inSampleSize set
+            Bitmap bitmap = decodeImage(resolver, uri, options);
+
+            return new BitmapSampled(bitmap, options.inSampleSize);
+
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Failed to load sampled bitmap: " + uri + "\r\n" + e.getMessage(), e);
+        }
+    }
+
+    static BitmapSampled decodeSampledBitmapMin(Context context, Uri uri, int reqWidth, int reqHeight) {
+
+        try {
+            ContentResolver resolver = context.getContentResolver();
+
+            // First decode with inJustDecodeBounds=true to check dimensions
+            BitmapFactory.Options options = decodeImageForOption(resolver, uri);
+
+            if (options.outWidth == -1 && options.outHeight == -1)
+                throw new RuntimeException("File is not a picture");
+
+            // Calculate inSampleSize
+            options.inSampleSize =
+                    Math.max(
+                            calculateInSampleSizeByRequestedSize(
                                     options.outWidth, options.outHeight, reqWidth, reqHeight),
                             calculateInSampleSizeByMaxTextureSize(options.outWidth, options.outHeight));
 
@@ -183,7 +226,7 @@ final class BitmapUtils {
      * image that contains the requires rectangle, rotate and then crop again a sub rectangle.
      *
      * @param scale how much to scale the cropped image part, use 0.5 to lower the image by half (OOM
-     *     handling)
+     *              handling)
      */
     private static Bitmap cropBitmapObjectWithScale(
             Bitmap bitmap,
@@ -287,42 +330,58 @@ final class BitmapUtils {
         }
     }
 
-    /** Get left value of the bounding rectangle of the given points. */
+    /**
+     * Get left value of the bounding rectangle of the given points.
+     */
     static float getRectLeft(float[] points) {
         return Math.min(Math.min(Math.min(points[0], points[2]), points[4]), points[6]);
     }
 
-    /** Get top value of the bounding rectangle of the given points. */
+    /**
+     * Get top value of the bounding rectangle of the given points.
+     */
     static float getRectTop(float[] points) {
         return Math.min(Math.min(Math.min(points[1], points[3]), points[5]), points[7]);
     }
 
-    /** Get right value of the bounding rectangle of the given points. */
+    /**
+     * Get right value of the bounding rectangle of the given points.
+     */
     static float getRectRight(float[] points) {
         return Math.max(Math.max(Math.max(points[0], points[2]), points[4]), points[6]);
     }
 
-    /** Get bottom value of the bounding rectangle of the given points. */
+    /**
+     * Get bottom value of the bounding rectangle of the given points.
+     */
     static float getRectBottom(float[] points) {
         return Math.max(Math.max(Math.max(points[1], points[3]), points[5]), points[7]);
     }
 
-    /** Get width of the bounding rectangle of the given points. */
+    /**
+     * Get width of the bounding rectangle of the given points.
+     */
     static float getRectWidth(float[] points) {
         return getRectRight(points) - getRectLeft(points);
     }
 
-    /** Get height of the bounding rectangle of the given points. */
+    /**
+     * Get height of the bounding rectangle of the given points.
+     */
     static float getRectHeight(float[] points) {
         return getRectBottom(points) - getRectTop(points);
     }
 
-    /** Get horizontal center value of the bounding rectangle of the given points. */
+    /**
+     * Get horizontal center value of the bounding rectangle of the given points.
+     */
     static float getRectCenterX(float[] points) {
         return (getRectRight(points) + getRectLeft(points)) / 2f;
     }
 
-    /** Get vertical center value of the bounding rectangle of the given points. */
+    /**
+     * Get vertical center value of the bounding rectangle of the given points.
+     */
     static float getRectCenterY(float[] points) {
         return (getRectBottom(points) + getRectTop(points)) / 2f;
     }
@@ -371,7 +430,7 @@ final class BitmapUtils {
      *
      * @param uri the uri to write the bitmap to, if null
      * @return the uri where the image was saved in, either the given uri or new pointing to temp
-     *     file.
+     * file.
      */
     static Uri writeTempStateStoreBitmap(Context context, Bitmap bitmap, Uri uri) {
         try {
@@ -393,7 +452,9 @@ final class BitmapUtils {
         }
     }
 
-    /** Write the given bitmap to the given uri using the given compression. */
+    /**
+     * Write the given bitmap to the given uri using the given compression.
+     */
     static void writeBitmapToUri(
             Context context,
             Bitmap bitmap,
@@ -410,7 +471,9 @@ final class BitmapUtils {
         }
     }
 
-    /** Resize the given bitmap to the given width/height by the given option.<br> */
+    /**
+     * Resize the given bitmap to the given width/height by the given option.<br>
+     */
     static Bitmap resizeBitmap(
             Bitmap bitmap, int reqWidth, int reqHeight, CropImageView.RequestSizeOptions options) {
         try {
@@ -452,8 +515,8 @@ final class BitmapUtils {
      * Crop image bitmap from URI by decoding it with specific width and height to down-sample if
      * required.
      *
-     * @param orgWidth used to get rectangle from points (handle edge cases to limit rectangle)
-     * @param orgHeight used to get rectangle from points (handle edge cases to limit rectangle)
+     * @param orgWidth    used to get rectangle from points (handle edge cases to limit rectangle)
+     * @param orgHeight   used to get rectangle from points (handle edge cases to limit rectangle)
      * @param sampleMulti used to increase the sampling of the image to handle memory issues.
      */
     private static BitmapSampled cropBitmap(
@@ -557,7 +620,7 @@ final class BitmapUtils {
             options.inSampleSize =
                     sampleSize =
                             sampleMulti
-                                    * calculateInSampleSizeByReqestedSize(rect.width(), rect.height(), width, height);
+                                    * calculateInSampleSizeByRequestedSize(rect.width(), rect.height(), width, height);
 
             Bitmap fullBitmap = decodeImage(context.getContentResolver(), loadedImageUri, options);
             if (fullBitmap != null) {
@@ -598,7 +661,9 @@ final class BitmapUtils {
         return new BitmapSampled(result, sampleSize);
     }
 
-    /** Decode image from uri using "inJustDecodeBounds" to get the image dimensions. */
+    /**
+     * Decode image from uri using "inJustDecodeBounds" to get the image dimensions.
+     */
     private static BitmapFactory.Options decodeImageForOption(ContentResolver resolver, Uri uri)
             throws FileNotFoundException {
         InputStream stream = null;
@@ -649,7 +714,7 @@ final class BitmapUtils {
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inSampleSize =
                     sampleMulti
-                            * calculateInSampleSizeByReqestedSize(
+                            * calculateInSampleSizeByRequestedSize(
                             rect.width(), rect.height(), reqWidth, reqHeight);
 
             stream = context.getContentResolver().openInputStream(uri);
@@ -723,11 +788,12 @@ final class BitmapUtils {
      * Calculate the largest inSampleSize value that is a power of 2 and keeps both height and width
      * larger than the requested height and width.
      */
-    private static int calculateInSampleSizeByReqestedSize(
+    private static int calculateInSampleSizeByRequestedSize(
             int width, int height, int reqWidth, int reqHeight) {
         int inSampleSize = 1;
         if (height > reqHeight || width > reqWidth) {
-            while ((height / 2 / inSampleSize) > reqHeight && (width / 2 / inSampleSize) > reqWidth) {
+//            while ((height / 2 / inSampleSize) > reqHeight && (width / 2 / inSampleSize) > reqWidth) {
+            while ((height / 2 / inSampleSize) > reqHeight || (width / 2 / inSampleSize) > reqWidth) {
                 inSampleSize *= 2;
             }
         }
@@ -799,7 +865,7 @@ final class BitmapUtils {
             egl.eglGetConfigs(display, configurationsList, totalConfigurations[0], totalConfigurations);
 
             int[] textureSize = new int[1];
-            int maximumTextureSize = 0;
+            int maximumTextureSize = 0;//8192
 
             // Iterate through all the configurations to located the maximum texture size
             for (int i = 0; i < totalConfigurations[0]; i++) {
@@ -841,13 +907,19 @@ final class BitmapUtils {
 
     // region: Inner class: BitmapSampled
 
-    /** Holds bitmap instance and the sample size that the bitmap was loaded/cropped with. */
+    /**
+     * Holds bitmap instance and the sample size that the bitmap was loaded/cropped with.
+     */
     static final class BitmapSampled {
 
-        /** The bitmap instance */
+        /**
+         * The bitmap instance
+         */
         public final Bitmap bitmap;
 
-        /** The sample size used to lower the size of the bitmap (1,2,4,8,...) */
+        /**
+         * The sample size used to lower the size of the bitmap (1,2,4,8,...)
+         */
         final int sampleSize;
 
         BitmapSampled(Bitmap bitmap, int sampleSize) {
@@ -859,13 +931,19 @@ final class BitmapUtils {
 
     // region: Inner class: RotateBitmapResult
 
-    /** The result of {@link #rotateBitmapByExif(Bitmap, ExifInterface)}. */
+    /**
+     * The result of {@link #rotateBitmapByExif(Bitmap, ExifInterface)}.
+     */
     static final class RotateBitmapResult {
 
-        /** The loaded bitmap */
+        /**
+         * The loaded bitmap
+         */
         public final Bitmap bitmap;
 
-        /** The degrees the image was rotated */
+        /**
+         * The degrees the image was rotated
+         */
         final int degrees;
 
         RotateBitmapResult(Bitmap bitmap, int degrees) {

@@ -47,6 +47,8 @@ public class CropImageActivity extends AppCompatActivity
         implements CropImageView.OnSetImageUriCompleteListener,
         CropImageView.OnCropImageCompleteListener {
 
+    private Boolean isMultipleImage;
+
     /**
      * The crop image view library widget used in the activity
      */
@@ -72,28 +74,8 @@ public class CropImageActivity extends AppCompatActivity
         Bundle bundle = getIntent().getBundleExtra(CropImage.CROP_IMAGE_EXTRA_BUNDLE);
         mCropImageUri = bundle.getParcelable(CropImage.CROP_IMAGE_EXTRA_SOURCE);
         mOptions = bundle.getParcelable(CropImage.CROP_IMAGE_EXTRA_OPTIONS);
+        isMultipleImage = bundle.getBoolean(CropImage.CROP_IMAGE_IS_SINGLE, false);
         mCropImageView.setImageUriAsync(mCropImageUri);
-
-        /*if (savedInstanceState == null) {
-            if (mCropImageUri == null || mCropImageUri.equals(Uri.EMPTY)) {
-                if (CropImage.isExplicitCameraPermissionRequired(this)) {
-                    // request permissions and handle the result in onRequestPermissionsResult()
-                    requestPermissions(
-                            new String[]{Manifest.permission.CAMERA},
-                            CropImage.CAMERA_CAPTURE_PERMISSIONS_REQUEST_CODE);
-                } else {
-                    CropImage.startPickImageActivity(startActivityResultLauncher, this);
-                }
-            } else if (CropImage.isReadExternalStoragePermissionsRequired(this, mCropImageUri)) {
-                // request permissions and handle the result in onRequestPermissionsResult()
-                requestPermissions(
-                        new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
-                        CropImage.PICK_IMAGE_PERMISSIONS_REQUEST_CODE);
-            } else {
-                // no permissions required or already grunted, can start crop image activity
-                mCropImageView.setImageUriAsync(mCropImageUri);
-            }
-        }*/
 
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
@@ -246,7 +228,7 @@ public class CropImageActivity extends AppCompatActivity
         if (requestCode == CropImage.CAMERA_CAPTURE_PERMISSIONS_REQUEST_CODE) {
             // Irrespective of whether camera permission was given or not, we show the picker
             // The picker will not add the camera intent if permission is not available
-            CropImage.startPickImageActivity(startActivityResultLauncher,this);
+            CropImage.startPickImageActivity(startActivityResultLauncher, this, isMultipleImage);
         }
     }
 

@@ -25,4 +25,14 @@
         android:padding="20dp"
         android:src="@drawable/add_icon" />
 
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/switch_multi_image"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:text="Multiple Images"
+        android:paddingVertical="30dp"
+        android:src="@drawable/add_icon" />
+
 </RelativeLayout>
