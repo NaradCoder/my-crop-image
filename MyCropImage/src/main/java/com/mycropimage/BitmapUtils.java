@@ -12,6 +12,7 @@
 
 package com.mycropimage;
 
+import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -21,11 +22,14 @@ import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.net.Uri;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.util.Pair;
 
 import androidx.exifinterface.media.ExifInterface;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -42,7 +46,7 @@ import javax.microedition.khronos.egl.EGLDisplay;
 /**
  * Utility class that deals with operations with an ImageView.
  */
-final class BitmapUtils {
+final public class BitmapUtils {
 
     static final Rect EMPTY_RECT = new Rect();
 
@@ -149,33 +153,49 @@ final class BitmapUtils {
         }
     }
 
-    static BitmapSampled decodeSampledBitmapMin(Context context, Uri uri, int reqWidth, int reqHeight) {
-
+    public static Bitmap resizeBitmap(Context context, Uri uri, int reqWidth, int reqHeight) {
         try {
-            ContentResolver resolver = context.getContentResolver();
 
-            // First decode with inJustDecodeBounds=true to check dimensions
-            BitmapFactory.Options options = decodeImageForOption(resolver, uri);
+            BitmapUtils.BitmapSampled decodeResult =
+                    BitmapUtils.decodeSampledBitmap(context, uri, reqWidth, reqHeight);
 
-            if (options.outWidth == -1 && options.outHeight == -1)
-                throw new RuntimeException("File is not a picture");
+            ExifInterface ei = new ExifInterface(context.getContentResolver().openInputStream(uri));
+            int orientation = ei.getAttributeInt(ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_UNDEFINED);
 
-            // Calculate inSampleSize
-            options.inSampleSize =
-                    Math.max(
-                            calculateInSampleSizeByRequestedSize(
-                                    options.outWidth, options.outHeight, reqWidth, reqHeight),
-                            calculateInSampleSizeByMaxTextureSize(options.outWidth, options.outHeight));
+            Bitmap rotatedBitmap = null;
+            switch(orientation) {
+                case ExifInterface.ORIENTATION_ROTATE_90:
+                    rotatedBitmap = rotateImage(decodeResult.bitmap, 90);
+                    break;
 
-            // Decode bitmap with inSampleSize set
-            Bitmap bitmap = decodeImage(resolver, uri, options);
+                case ExifInterface.ORIENTATION_ROTATE_180:
+                    rotatedBitmap = rotateImage(decodeResult.bitmap, 180);
+                    break;
 
-            return new BitmapSampled(bitmap, options.inSampleSize);
+                case ExifInterface.ORIENTATION_ROTATE_270:
+                    rotatedBitmap = rotateImage(decodeResult.bitmap, 270);
+                    break;
+
+                case ExifInterface.ORIENTATION_NORMAL:
+                default:
+                    rotatedBitmap = decodeResult.bitmap;
+            }
+
+            return rotatedBitmap;
 
         } catch (Exception e) {
             throw new RuntimeException(
                     "Failed to load sampled bitmap: " + uri + "\r\n" + e.getMessage(), e);
         }
+
+    }
+
+    public static Bitmap rotateImage(Bitmap source, float angle) {
+        Matrix matrix = new Matrix();
+        matrix.postRotate(angle);
+        return Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(),
+                matrix, true);
     }
 
     /**
@@ -792,8 +812,7 @@ final class BitmapUtils {
             int width, int height, int reqWidth, int reqHeight) {
         int inSampleSize = 1;
         if (height > reqHeight || width > reqWidth) {
-//            while ((height / 2 / inSampleSize) > reqHeight && (width / 2 / inSampleSize) > reqWidth) {
-            while ((height / 2 / inSampleSize) > reqHeight || (width / 2 / inSampleSize) > reqWidth) {
+            while ((height / 2 / inSampleSize) > reqHeight && (width / 2 / inSampleSize) > reqWidth) {
                 inSampleSize *= 2;
             }
         }

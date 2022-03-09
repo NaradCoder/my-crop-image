@@ -1,5 +1,6 @@
 package com.cropimagedemo;
 
+import android.graphics.Bitmap;
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -8,6 +9,7 @@ public class MoreBean implements Parcelable {
     private int id;
     private String name;
     private int image;
+    private Bitmap bitmapImage;
 
     public MoreBean(int id, String name, int image) {
         this.id = id;
@@ -15,10 +17,18 @@ public class MoreBean implements Parcelable {
         this.image = image;
     }
 
+    public MoreBean(int id, String name, int image, Bitmap bitmapImage) {
+        this.id = id;
+        this.name = name;
+        this.image = image;
+        this.bitmapImage = bitmapImage;
+    }
+
     protected MoreBean(Parcel in) {
         id = in.readInt();
         name = in.readString();
         image = in.readInt();
+        bitmapImage = in.readParcelable(Bitmap.class.getClassLoader());
     }
 
     public static final Creator<MoreBean> CREATOR = new Creator<MoreBean>() {
@@ -57,6 +67,14 @@ public class MoreBean implements Parcelable {
         this.image = image;
     }
 
+    public Bitmap getBitmapImage() {
+        return bitmapImage;
+    }
+
+    public void setBitmapImage(Bitmap bitmapImage) {
+        this.bitmapImage = bitmapImage;
+    }
+
     @Override
     public int describeContents() {
         return 0;
@@ -67,5 +85,6 @@ public class MoreBean implements Parcelable {
         dest.writeInt(id);
         dest.writeString(name);
         dest.writeInt(image);
+        dest.writeParcelable(bitmapImage, flags);
     }
 }

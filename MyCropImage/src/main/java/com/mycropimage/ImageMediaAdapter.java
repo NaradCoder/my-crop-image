@@ -2,7 +2,9 @@ package com.mycropimage;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.net.Uri;
+import android.provider.MediaStore;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -11,15 +13,18 @@ import android.widget.ImageView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.io.IOException;
 import java.util.List;
 
 public class ImageMediaAdapter extends RecyclerView.Adapter<ImageMediaAdapter.MyViewHolder> {
     public List<String> list;
+    public List<Bitmap> bitmapList;
     Context context;
     ClickImageListener clickImageListener;
 
-    public ImageMediaAdapter(List<String> list, Context context, ClickImageListener clickImageListener) {
+    public ImageMediaAdapter(List<String> list, List<Bitmap> bitmapList, Context context, ClickImageListener clickImageListener) {
         this.list = list;
+        this.bitmapList = bitmapList;
         this.context = context;
         this.clickImageListener = clickImageListener;
     }
@@ -39,21 +44,27 @@ public class ImageMediaAdapter extends RecyclerView.Adapter<ImageMediaAdapter.My
 
     @Override
     public void onBindViewHolder(@NonNull MyViewHolder holder, int position) {
-        Uri uri = Uri.parse(list.get(position));
-        holder.image.setImageURI(uri);
+        holder.image.setImageBitmap(bitmapList.get(position));
     }
 
     public List<String> getList() {
         return list;
     }
 
+    public List<Bitmap> getBitmapList() {
+        return bitmapList;
+    }
+
     @SuppressLint("NotifyDataSetChanged")
-    public void setItem(String bean) {
-        list.add(bean);
+    public void setItem(String uri, Bitmap bitmap) {
+        list.add(uri);
+        bitmapList.add(bitmap);
         notifyDataSetChanged();
     }
-    public void updateItem(String uri, int position) {
+
+    public void updateItem(String uri, Bitmap bitmap, int position) {
         list.set(position, uri);
+        bitmapList.set(position, bitmap);
         notifyItemChanged(position);
     }
 

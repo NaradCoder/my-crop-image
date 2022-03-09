@@ -63,7 +63,9 @@ final class BitmapLoadingWorkerTask
         double densityAdj = metrics.density > 1 ? 1 / metrics.density : 1;
         mWidth = (int) (metrics.widthPixels * densityAdj);
         mHeight = (int) (metrics.heightPixels * densityAdj);
+
     }
+
 
     /**
      * The Android URI that this task is currently loading.

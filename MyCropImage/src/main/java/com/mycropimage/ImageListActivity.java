@@ -30,7 +30,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 
@@ -43,9 +42,6 @@ public class ImageListActivity extends AppCompatActivity {
     private Uri mCropImageUri;
     private Boolean isMultipleImage;
 
-    private int mWidth;
-    private int mHeight;
-
     @SuppressLint("NewApi")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,18 +50,16 @@ public class ImageListActivity extends AppCompatActivity {
         getScreenWidth();
         rvMedia = findViewById(R.id.rv_media);
         showImage = findViewById(R.id.iv_show_image);
-        adapter = new ImageMediaAdapter(new ArrayList<>(), this, (strUri, position, type) -> {
+        adapter = new ImageMediaAdapter(new ArrayList<>(), new ArrayList<>(), this, (strUri, position, type) -> {
             if (type.equalsIgnoreCase("crop")) {
                 clickPosition = position;
-                Uri uri = Uri.parse(strUri);
-                showImage.setImageURI(uri);
+                showImage.setImageBitmap(adapter.bitmapList.get(position));
             } else if (type.equalsIgnoreCase("remove")) {
                 adapter.getList().remove(position);
                 adapter.notifyItemRemoved(position);
                 if (adapter.getList().size() > 0) {
                     clickPosition = 0;
-                    Uri uri = Uri.parse(adapter.getList().get(0));
-                    showImage.setImageURI(uri);
+                    showImage.setImageBitmap(adapter.bitmapList.get(0));
                 } else {
                     clickPosition = -1;
                     showImage.setImageURI(null);
@@ -174,31 +168,26 @@ public class ImageListActivity extends AppCompatActivity {
                                                 CropImage.PICK_IMAGE_PERMISSIONS_REQUEST_CODE);
                                     }
                                 } else {
-                                    resizeImage(mCropImageUri);
-                                    adapter.setItem(mCropImageUri.toString());
+                                    adapter.setItem(mCropImageUri.toString(), resizeImage(mCropImageUri));
                                 }
                             } else {
                                 if (intent.getData() != null) {
                                     Uri imageUri = intent.getData();
-                                    resizeImage(imageUri);
-                                    adapter.setItem(imageUri.toString());
+                                    adapter.setItem(imageUri.toString(), resizeImage(imageUri));
 
                                 } else if (intent.getClipData() != null) {
                                     ClipData mClipData = intent.getClipData();
                                     for (int i = 0; i < mClipData.getItemCount(); i++) {
                                         ClipData.Item item = mClipData.getItemAt(i);
                                         Uri imageUri = item.getUri();
-                                        resizeImage(imageUri);
-                                        adapter.setItem(imageUri.toString());
+                                        adapter.setItem(imageUri.toString(), resizeImage(imageUri));
                                     }
-
                                 }
                             }
 
                             if (clickPosition == -1 && adapter.getList().size() > 0) {
                                 clickPosition = 0;
-                                Uri uri = Uri.parse(adapter.getList().get(0));
-                                showImage.setImageURI(uri);
+                                showImage.setImageBitmap(adapter.bitmapList.get(0));
                                 ivDone.setVisibility(View.VISIBLE);
                             }
                             if (!isMultipleImage || adapter.getList().size() == 1) {
@@ -212,15 +201,12 @@ public class ImageListActivity extends AppCompatActivity {
                 }
             });
 
-    private void resizeImage(Uri mUri) {
-
-        BitmapUtils.BitmapSampled decodeResult =
-                BitmapUtils.decodeSampledBitmapMin(ImageListActivity.this, mUri, mWidth, mHeight);
+    private Bitmap resizeImage(Uri mUri) {
         try {
-            BitmapUtils.writeBitmapToUri(
-                    ImageListActivity.this, decodeResult.bitmap, getOutputUri(), Bitmap.CompressFormat.JPEG, 0);
-        } catch (FileNotFoundException e) {
+            return BitmapUtils.resizeBitmap(ImageListActivity.this, mUri, 200, 200);
+        } catch (Exception e) {
             e.printStackTrace();
+            return null;
         }
     }
 
@@ -239,13 +225,13 @@ public class ImageListActivity extends AppCompatActivity {
             WindowMetrics windowMetrics = getWindowManager().getCurrentWindowMetrics();
             Insets insets = windowMetrics.getWindowInsets()
                     .getInsetsIgnoringVisibility(WindowInsets.Type.systemBars());
-            mWidth = windowMetrics.getBounds().width() - insets.left - insets.right;
-            mHeight = windowMetrics.getBounds().height() - insets.top - insets.bottom;
+//            mWidth = windowMetrics.getBounds().width() - insets.left - insets.right;
+//            mHeight = windowMetrics.getBounds().height() - insets.top - insets.bottom;
         } else {
             DisplayMetrics displayMetrics = new DisplayMetrics();
             getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
-            mWidth = displayMetrics.widthPixels;
-            mHeight = displayMetrics.heightPixels;
+//            mWidth = displayMetrics.widthPixels;
+//            mHeight = displayMetrics.heightPixels;
         }
     }
 
@@ -263,8 +249,8 @@ public class ImageListActivity extends AppCompatActivity {
                         CropImage.ActivityResult result1 = CropImage.getActivityResult(data);
                         if (result1 != null) {
                             Uri selectedUri = result1.getUri();
-                            adapter.updateItem(selectedUri.toString(), clickPosition);
-                            showImage.setImageURI(selectedUri);
+                            adapter.updateItem(selectedUri.toString(), resizeImage(selectedUri), clickPosition);
+                            showImage.setImageBitmap(adapter.bitmapList.get(clickPosition));
                             if (!isMultipleImage || adapter.getList().size() == 1) {
                                 setResultOk();
                             }

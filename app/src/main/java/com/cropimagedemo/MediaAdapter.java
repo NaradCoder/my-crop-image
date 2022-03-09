@@ -52,9 +52,9 @@ public class MediaAdapter extends RecyclerView.Adapter<MediaAdapter.MyViewHolder
             }
             holder.vid_icon.setVisibility(View.VISIBLE);
         } else {
-            if (list.get(position).getName().contains("://") || list.get(position).getName().contains("file:/") || list.get(position).getName().contains("cache") || list.get(position).getName().substring(0, 1).equalsIgnoreCase("/")) {
-                Uri uri = Uri.parse(list.get(position).getName());
-                holder.image.setImageURI(uri);
+            if (list.get(position).getBitmapImage() != null) {
+//            if (list.get(position).getName().contains("://") || list.get(position).getName().contains("file:/") || list.get(position).getName().contains("cache") || list.get(position).getName().substring(0, 1).equalsIgnoreCase("/")) {
+                holder.image.setImageBitmap(list.get(position).getBitmapImage());
             }
         }
         holder.vid_icon.setVisibility(View.GONE);
@@ -70,6 +70,7 @@ public class MediaAdapter extends RecyclerView.Adapter<MediaAdapter.MyViewHolder
         list.add(bean);
         notifyDataSetChanged();
     }
+
     public void updateItem(String uri, int position) {
         list.get(position).setName(uri);
         notifyItemChanged(position);
@@ -96,7 +97,7 @@ public class MediaAdapter extends RecyclerView.Adapter<MediaAdapter.MyViewHolder
 
             crossImage.setOnClickListener(view -> clickImageListener.onClick(list.get(getAdapterPosition()), getAdapterPosition(), "remove"));
 
-            itemView.setOnClickListener(v -> clickImageListener.onClick(list.get(getAdapterPosition()), getAdapterPosition(), "crop"));
+            itemView.setOnClickListener(v -> clickImageListener.onClick(list.get(getAdapterPosition()), getAdapterPosition(), "preview"));
         }
     }
 

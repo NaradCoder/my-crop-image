@@ -5,18 +5,18 @@ import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
 import android.util.Log
+import android.view.View
+import android.widget.FrameLayout
 import android.widget.ImageView
-import android.widget.Switch
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.mycropimage.BitmapUtils
 import com.mycropimage.CropImage
-import java.io.File
 import java.lang.Exception
 import java.util.ArrayList
 
@@ -27,12 +27,28 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        val flPreview = findViewById<FrameLayout>(R.id.fl_preview)
+        val ivPreview = findViewById<ImageView>(R.id.iv_preview)
+        val ivClose = findViewById<ImageView>(R.id.iv_close)
+
+        ivClose.setOnClickListener {
+            flPreview.visibility = View.GONE
+        }
+
+
         val rvMedia = findViewById<RecyclerView>(R.id.rv_media)
         val switchMultiImage = findViewById<SwitchCompat>(R.id.switch_multi_image)
         adapter = MediaAdapter(
             ArrayList(),
             this
-        ) { _, _, _ -> }
+        ) { moreBean, _, type ->
+            if (type.equals("preview")) {
+                flPreview.visibility = View.VISIBLE
+                ivPreview.setImageBitmap(moreBean.bitmapImage)
+            }
+
+        }
 
         rvMedia.adapter = adapter
 
@@ -94,10 +110,14 @@ class MainActivity : AppCompatActivity() {
                 val intent: Intent? = result.data
                 val uriList: List<String> = CropImage.getActivityResultList(intent)
                 for (i in uriList.indices) {
-                    adapter!!.setItem(MoreBean(0, uriList[i], 0))
+                    adapter!!.setItem(MoreBean(0, uriList[i], 0, BitmapUtils.resizeBitmap(this@MainActivity, Uri.parse(uriList[i]), 400, 400)))
                     Log.e(
                         "MainActivity",
-                        "registerForActivityResult_getClipData_$i: ${uriList[i]}\n${Uri.parse(uriList[i]).path}"
+                        "registerForActivityResult_getClipData_$i: ${uriList[i]}\n${
+                            Uri.parse(
+                                uriList[i]
+                            ).path
+                        }"
                     )
                 }
             }
